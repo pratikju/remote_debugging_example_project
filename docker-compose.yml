@@ -1,0 +1,41 @@
+version: '3'
+
+services:
+  remote_db:
+    image: postgres:12
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: remote_user
+      POSTGRES_USER: remote_user
+      POSTGRES_DB: remote
+    ports:
+      - "5434:5432"
+
+  remote_dbmate:
+    build: ./dbmate
+    environment:
+      DATABASE_URL: postgres://remote_user:remote_user@remote_db:5432/remote?sslmode=disable
+    volumes:
+    - ./:/usr/data
+    depends_on:
+    - remote_db
+    working_dir: /usr/data
+    command: bash -c "dbmate wait && dbmate drop && dbmate up && dbmate dump"
+
+  remote_web:
+    build: ./
+    volumes:
+      - ./:/app
+    environment:
+      - FLASK_APP=remote_debugging/app.py
+      - DB_URL=remote_db
+      - DB_USER=remote_user
+      - DB_PASS=remote_user
+      - DB_NAME=remote
+      - FLASK_DEBUG=1
+      
+    depends_on:
+    - remote_dbmate
+    ports:
+    - "9200:5000"
+    command: flask run --host="0.0.0.0"
